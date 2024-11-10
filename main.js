@@ -13,7 +13,11 @@ THREE.Mesh.prototype.raycast = acceleratedRaycast;
 const particleRadius = 40;
 const group = new Group(); 
 
-let scene, camera, renderer, controls;
+
+let cameraProgress = 0; // Progress along the curve (0 to 1)
+const cameraSpeed = 0.0012; // Adjust speed as needed  
+
+let scene, camera, renderer, controls, curve;
 let pointsMesh0, pointsMesh1;
 let uniforms = {
     particles: {
@@ -30,6 +34,7 @@ function init() {
     initCamera();
     initRenderer();
     initControls();
+    defineCameraPath();
     loadModel();
     window.addEventListener('resize', onWindowResize, false);
 
@@ -48,14 +53,30 @@ function initScene() {
     scene = new THREE.Scene();
 }
 
+function defineCameraPath() {
+    curve = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(40, 0, 40),
+        new THREE.Vector3(-40, 0, 40),
+        new THREE.Vector3(-40, 0, -40),
+        new THREE.Vector3(40, 0, -40),
+        new THREE.Vector3(40, 0, 40),
+        new THREE.Vector3(0, 0, 20)
+    ],
+    );
+
+    const tubeGeometry = new THREE.TubeGeometry(curve, 100, 2, 8, true);
+    const tubeMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000, wireframe: true });
+    const tube = new THREE.Mesh(tubeGeometry, tubeMaterial);
+    //scene.add(tube);
+}
+
 function initCamera() {
     camera = new THREE.PerspectiveCamera(
-        75,
+        80,
         window.innerWidth / window.innerHeight,
         0.01,
         3000
     );
-    camera.position.set(0, 50, 50);
 }
 
 function initRenderer() {
@@ -73,6 +94,7 @@ function initControls() {
     controls.enableDamping = true;
     controls.dampingFactor = 0.25;
     controls.target.set(0, 0, 0);
+    controls.enabled = false;
 }
 
 function loadModel() {
@@ -83,6 +105,9 @@ function loadModel() {
         model.material.normalMapType = THREE.ObjectSpaceNormalMap;
 
         let geom = model.geometry;
+
+        geom.rotateX(Math.PI / 2);
+
         geom.computeVertexNormals();
         geom.center();
         geom.computeBoundsTree();
@@ -295,7 +320,7 @@ function fillWithPoints(mesh, count) {
     const vps = new THREE.Vector3();
     let counter = 0;
 
-    const offScreenRadius = Math.max(bsize.x, bsize.y, bsize.z) * .45;
+    const offScreenRadius = Math.max(bsize.x, bsize.y, bsize.z) * .5;
 
     while (counter < count) {
         v.set(
@@ -346,7 +371,23 @@ function onWindowResize() {
 
 function animate(time) {
     requestAnimationFrame(animate);
+    group.update(time * 2); 
+
+    if (cameraProgress <= 1) {
+        cameraProgress += cameraSpeed;
+        if (cameraProgress > 1) cameraProgress = 1;
+
+        const newCameraPosition = curve.getPoint(cameraProgress);
+        camera.position.copy(newCameraPosition);
+
+        const nextPoint = curve.getPoint((cameraProgress + 0.001) % 1);
+        camera.lookAt(nextPoint);
+
+    } else {
+        camera.position.set(0, 0, 20);
+        camera.lookAt(new THREE.Vector3(0, 0, 0));
+    }
+
     controls.update();
-    group.update(time*3.5); 
     renderer.render(scene, camera);
 }
