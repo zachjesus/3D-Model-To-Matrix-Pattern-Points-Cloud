@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { Tween, Group } from '@tweenjs/tween.js';
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import {
     computeBoundsTree, disposeBoundsTree, acceleratedRaycast,
 } from 'three-mesh-bvh';
@@ -15,9 +16,9 @@ const group = new Group();
 
 
 let cameraProgress = 0; // Progress along the curve (0 to 1)
-const cameraSpeed = 0.0012; // Adjust speed as needed  
+let cameraSpeed = 0.0018; // Adjust speed as needed  
 
-let scene, camera, renderer, controls, curve;
+let scene, camera, renderer, controls, curve, glowingRectangle;
 let pointsMesh0, pointsMesh1;
 let uniforms = {
     particles: {
@@ -51,17 +52,23 @@ function init() {
 
 function initScene() {
     scene = new THREE.Scene();
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 1);
+    scene.add(ambientLight);
 }
 
 function defineCameraPath() {
     curve = new THREE.CatmullRomCurve3([
         new THREE.Vector3(40, 0, 40),
-        new THREE.Vector3(-40, 0, 40),
-        new THREE.Vector3(-40, 0, -40),
-        new THREE.Vector3(40, 0, -40),
-        new THREE.Vector3(40, 0, 40),
-        new THREE.Vector3(0, 0, 20)
+        new THREE.Vector3(-40, 5, 40),
+        new THREE.Vector3(-40, 7, -40),
+        new THREE.Vector3(40, 7, -40),
+        new THREE.Vector3(40, 5, 40),
+        new THREE.Vector3(0, 0, 25)
     ],
+    false,
+    'centripetal',
+    .2
     );
 
     const tubeGeometry = new THREE.TubeGeometry(curve, 100, 2, 8, true);
@@ -72,19 +79,20 @@ function defineCameraPath() {
 
 function initCamera() {
     camera = new THREE.PerspectiveCamera(
-        80,
+        85,
         window.innerWidth / window.innerHeight,
         0.01,
         3000
     );
+    camera.position.set(0, 0, 23);
 }
 
 function initRenderer() {
     renderer = new THREE.WebGLRenderer({
-        alpha: true,
+        alpha: false,
         antialias: true
     });
-    renderer.setClearColor(0x000000, 0);
+    renderer.setClearColor(0x000000, 1);
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 }
@@ -127,7 +135,7 @@ function loadModel() {
 }
 
 function createPoints(mesh) {
-    const { positions, positionsStart, positionsDelay } = fillWithPoints(mesh, 5000);
+    const { positions, positionsStart, positionsDelay } = fillWithPoints(mesh, 4000);
 
     const points0 = [];
     const points1 = [];
@@ -158,8 +166,8 @@ function createPoints(mesh) {
     pointsGeometry1.setAttribute('positionStart', new THREE.Float32BufferAttribute(startPoints1, 3));
     pointsGeometry1.setAttribute('positionDelay', new THREE.Float32BufferAttribute(delays1, 1));
 
-    const pointsMaterial0 = createPointsMaterial(.85, '0', 'green');
-    const pointsMaterial1 = createPointsMaterial(.85, '1', 'green');
+    const pointsMaterial0 = createPointsMaterial(1, '0', 'green');
+    const pointsMaterial1 = createPointsMaterial(1, '1', 'green');
 
     pointsMesh0 = new THREE.Points(pointsGeometry0, pointsMaterial0);
     pointsMesh1 = new THREE.Points(pointsGeometry1, pointsMaterial1);
@@ -189,7 +197,7 @@ function createPointsMaterial(size, text, color) {
         sizeAttenuation: true,
         map: texture,
         transparent: true,
-        blending: THREE.NormalBlending,
+        blending: THREE.AdditiveBlending,
         depthWrite: false,
         depthTest: true,
         onBeforeCompile: (shader) => {
@@ -267,7 +275,7 @@ function createPointsMaterial(size, text, color) {
                 transformed = mix(pStart, pEnd, realAction);
 
                 float slope = sin(realAction * PI);
-                transformed.y += slope * distance(pStart, pEnd) * 0.5 * noise(pStart);
+                transformed.y += slope * distance(pStart, pEnd) * 0.5 * N31(pStart);
 
                 vTint = length(transformed.xz) / ${particleRadius}.;
                 `
@@ -287,11 +295,31 @@ function createPointsMaterial(size, text, color) {
                 .replace(
                     `#include <clipping_planes_fragment>`,
                     `
-                #include <clipping_planes_fragment>`
+                    #include <clipping_planes_fragment>`
                 )
                 .replace(
                     `#include <color_fragment>`,
                     `#include <color_fragment>
+
+                    // Define dark green and light green colors
+                    vec3 darkGreen = vec3(0.0, 0.3, 0.0); // Dark green
+                    vec3 lightGreen = vec3(0.0, 0.7, 0.0); // Light green
+
+                    // Interpolate between dark green and light green based on vTint
+                    vec3 finalColor = mix(darkGreen, lightGreen, clamp(vTint, 0.0, 1.0));
+
+                    // Simulate glow based on animation progress (vRealAction)
+                    float glowThreshold = .95; // Start glowing when vRealAction > 0.95
+                    float glowIntensity = smoothstep(glowThreshold, 1.0, vRealAction);
+
+                    // Apply the glow to the final color
+                    finalColor += glowIntensity * vec3(0.1, 0.2, 0.1); // Adjust glow color and intensity
+
+                    // Ensure the color remains within valid range
+                    finalColor = clamp(finalColor, 0.0, 1.0);
+
+                    // Apply the interpolated color to the fragment
+                    diffuseColor.rgb = finalColor;
                 `
                 );
         }
@@ -365,16 +393,16 @@ function fillWithPoints(mesh, count) {
 function onWindowResize() {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
-
     renderer.setSize(window.innerWidth, window.innerHeight);
 }
 
 function animate(time) {
     requestAnimationFrame(animate);
-    group.update(time * 2); 
+    group.update(time * 2.65); 
 
     if (cameraProgress <= 1) {
         cameraProgress += cameraSpeed;
+        if(cameraProgress >= 88) cameraSpeed += -0.004;
         if (cameraProgress > 1) cameraProgress = 1;
 
         const newCameraPosition = curve.getPoint(cameraProgress);
@@ -384,7 +412,7 @@ function animate(time) {
         camera.lookAt(nextPoint);
 
     } else {
-        camera.position.set(0, 0, 20);
+        camera.position.set(0, 0, 25);
         camera.lookAt(new THREE.Vector3(0, 0, 0));
     }
 
