@@ -8,4 +8,10 @@
 
 <b>Model of Orb...</b>
 
-![Untitled video - Made with Clipchamp](https://github.com/user-attachments/assets/6707c384-9a64-4b9f-afdc-d2e09d8bfef5)
+![orb](https://github.com/user-attachments/assets/6707c384-9a64-4b9f-afdc-d2e09d8bfef5)
+
+<b>Model of My Name with Animated Particles...</b>
+
+<video src='https://github.com/user-attachments/assets/fb9fd27b-0b33-4b49-87c3-47a64acb3dd5' width=180/>
+https://github.com/user-attachments/assets/fb9fd27b-0b33-4b49-87c3-47a64acb3dd5
+
