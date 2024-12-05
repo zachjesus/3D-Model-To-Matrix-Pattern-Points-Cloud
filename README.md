@@ -1,4 +1,4 @@
-<b>Description:</b> Convert any 3D model (.glb) to be made up green 1's and 0's (like the matrix) with a random points cloud effect. Uses three-mesh-bvh for accelerated raytracing. Has some basic glsl shaders to add kind of a glow effect to the numers as well. May be easily modified to suit your needs. There is also some Tween.js code included so that you may animate the particles to fly from a start pos of your liking to their final destination in the object. See in use at: [http://](https://www.zrosario.com/)!
+<b>Description:</b> Convert any 3D model (.glb) to be made up green 1's and 0's (like the matrix) with a random points cloud effect. Uses three-mesh-bvh for accelerated raytracing. Has some basic glsl shaders to add kind of a glow effect to the numers as well. May be easily modified to suit your needs. There is also some Tween.js code included so that you may animate the particles to fly from a start pos of your liking to their final destination in the object. See in use at: [zrosario.com](https://www.zrosario.com/)!
 
 Raytracing geometric point related math from: https://codesandbox.io/p/sandbox/great-http-xykxn written by user cywarr.
 
